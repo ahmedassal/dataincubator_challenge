@@ -1,4 +1,6 @@
+
 rm(list = ls())
+# Functions Definition #
 downloadData = function (dataURL, dataZipPath, dataZipFilename) {
   
   zipFile = paste0(dataZipPath, "/", dataZipFilename)
@@ -46,27 +48,19 @@ getDistanceFromLatLonInMiles = function(lat1,lon1,lat2,lon2) {
   return (d);
 }
 
-
+# Setup #
 gc()
-# packages = c("futile.logger", "SnowballC", "tm","RWeka", "stringi", "stringr", "ggplot2", "dplyr", "wordcloud", "RColorBrewer", "doParallel")
-packages = c("futile.logger", "data.table", "dplyr", "doParallel")
+packages = c("data.table", "dplyr", "doParallel")
 globals = list(packages = packages)
 rm(packages)
 setup_packages(globals$packages)
 
-
-# Setup ######################################################################
-
 cl = options(cores=12)
-registerDoParallel(cl)  # register cluster
+registerDoParallel(cl)
 globals$parallel = list(cl=cl)
 rm(cl)
-gc()
 
-# Path #######################################################################
-# workingPath = "D:/Woking/Courses/Data Science/Data Science/The Data Science Specialization/Data Science Capstone Project/Milestone Report/JHU-Data-Science-Capstone-Project-Milestone-Report"
-# setwd(workingPath)
-# workingDir = "G:/Working/Education/Formal/Data Science/Applications/Shorts/The Dat Incubator/Challenge/dataincubator_challenge"
+# Paths and Urls #
 workingDir = "D:/0Formal Education/Data Incubator/Challenge/dataincubator_challenge"
 setwd(workingDir)
 
@@ -79,35 +73,21 @@ tripFareFile = "data/trip_fare_3.csv"
 paths = list(workingDir= workingDir, dataPath = dataPath, dataFullPath = dataFullPath, tripDataUrl = tripDataUrl, tripFareUrl = tripFareUrl, tripDataFile = tripDataFile, tripFareFile = tripFareFile)
 globals$paths = paths
 rm(paths, workingDir, dataPath, dataFullPath, tripDataUrl, tripFareUrl, tripDataFile, tripFareFile)
-# urls = list(tripDataUrl, tripFareUrl)
-# dataZipFilenames = list("trip_data_3.csv.zip", "trip_fare_3.csv.zip")
-# Path #######################################################################
+
+# Preprocessing Data #
+gc()
+
+# downloading
 downloadData(dataURL=globals$paths$tripDataUrl, dataZipPath=globals$paths$dataFullPath, dataZipFilename="trip_data_3.csv.zip")
 downloadData(dataURL=globals$paths$tripFareUrl, dataZipPath=globals$paths$dataFullPath, dataZipFilename="trip_fare_3.csv.zip")
+
+# loading data
 tripData = fread(globals$paths$tripDataFile)
 tripFare = fread(globals$paths$tripFareFile)
-# lapply(X = urls, FUN = downloadData, dataZipPath=dataFullPath, dataZipFilename= dataZipFilenames)
+
+# cleaning data
 setnames(tripData, names(tripData), gsub(" ", "", names(tripData)))
 setnames(tripFare, names(tripFare), gsub(" ", "", names(tripFare)))
-gc()
-
-# What fraction of payments under $5 use a credit card*
-fare_below5USD_creditCard_frac = 
-  tripFare %>%
-    filter(tripFare$total_amount< 5.0) %>%
-    {
-      nrow(filter(., payment_type== "CRD")) / nrow(.)
-    }
-
-# What fraction of payments over $50 use a credit card*
-fare_over50USD_creditCard_frac = 
-  tripFare %>%
-  filter(tripFare$total_amount> 50.0) %>%
-  {
-    nrow(filter(., payment_type== "CRD")) / nrow(.)
-  }
-
-gc()
 
 setkey(tripData, medallion, hack_license, vendor_id, pickup_datetime)
 setkey(tripFare, medallion, hack_license, vendor_id, pickup_datetime)
@@ -116,44 +96,72 @@ mergedTripData = merge(tripData, tripFare, by = c("medallion", "hack_license", "
 rm(tripData, tripFare)
 gc()
 
-# What is the mean fare per minute driven?*
-any((is.na(mergedTripData$fare_amount) | is.na(mergedTripData$trip_time_in_secs)))
-cleanTripData = mergedTripData[mergedTripData$trip_time_in_secs != 0,]
-meanFarePerMinute0 = mean(cleanTripData$fare_amount /(cleanTripData$trip_time_in_secs / 60))
-meanFarePerMinute = sum(mergedTripData$fare_amount) / sum(mergedTripData$trip_time_in_secs / 60) 
-meanFarePerMinute2 = as.double(sum(mergedTripData$fare_amount)) / as.double(sum(mergedTripData$trip_time_in_secs / 60) )
-
-
-
-# What is the median of the taxi's fare per mile driven?*
-cleanTripData = mergedTripData[mergedTripData$trip_distance != 0,]
-farePerMile_median = median( cleanTripData$fare_amount / cleanTripData$trip_distance )
-# farePerMile_medianUncleaned = median( mergedTripData$fare_amount / mergedTripData$trip_distance )
-
-# What is the 95 percentile of the taxi's average driving speed in miles per hour?*
-cleanTripData = mergedTripData[mergedTripData$trip_time_in_secs != 0,]
-averageSpeed_95_percentile = quantile(cleanTripData$trip_distance / (cleanTripData$trip_time_in_secs / 3600), na.rm = TRUE, 0.95)
-
-# any((is.na(mergedTripData$trip_distance) | is.na(mergedTripData$trip_time_in_secs)))
-# any((is.na(mergedTripData$trip_distance) | is.na(mergedTripData$trip_time_in_secs)))
-# averageSpeed =  as.double(mergedTripData$trip_distance) / as.double(mergedTripData$trip_time_in_secs / 3600)
-# summary(averageSpeed)          
-# min(as.double(mergedTripData$trip_time_in_secs))
-# averageSpeed
-# averageSpeed_95_percentile = quantile(averageSpeed, na.rm = TRUE)
-# averageSpeed_95_percentile2 = quantile(mergedTripData$trip_distance / (mergedTripData$trip_time_in_secs / 3600), na.rm = TRUE)
-
-
-
-# What is the average ratio of the distance between the pickup and dropoff divided by the distance driven?*
 cleanTripData = mergedTripData[!(mergedTripData$trip_distance <= 0.01|
+                                   mergedTripData$total_amount == 0.0 |
                                    mergedTripData$trip_time_in_secs == 0| 
                                    mergedTripData$pickup_longitude == 0 |
                                    mergedTripData$pickup_latitude == 0  |
                                    mergedTripData$dropoff_longitude == 0 |
                                    mergedTripData$dropoff_latitude == 0 ),]
 
+cleanTripData$medallion = as.factor(cleanTripData$medallion)
+cleanTripData$hack_license = as.factor(cleanTripData$hack_license)
 
+rm(mergedTripData)
+
+# What fraction of payments under $5 use a credit card*
+gc()
+fare_below5USD_creditCard_frac = 
+  cleanTripData %>%
+    filter(cleanTripData$total_amount< 5.0) %>%
+    {
+      nrow(filter(., payment_type== "CRD")) / nrow(.)
+    }
+
+print(fare_below5USD_creditCard_frac)
+# What fraction of payments over $50 use a credit card*
+fare_over50USD_creditCard_frac = 
+  cleanTripData %>%
+  filter(cleanTripData$total_amount> 50.0) %>%
+  {
+    nrow(filter(., payment_type== "CRD")) / nrow(.)
+  }
+
+print(fare_over50USD_creditCard_frac)
+
+# What is the mean fare per minute driven?*
+gc()
+
+# no NAs
+any(is.na(cleanTripData$fare_amount) | 
+      is.na(cleanTripData$trip_distance) |
+      is.na(cleanTripData$trip_time_in_secs))
+# Two means here,
+
+# the first, we compute the mean of the fare rates of each trip, i.e. fare / mins
+# we are ineterested here on the mean of the fare rates over the different trips
+# this is a more fine-grained descriptive statistic of the data
+# This is my answer
+meanFarePerMinute1 = mean(cleanTripData$fare_amount /(cleanTripData$trip_time_in_secs / 60))
+print(meanFarePerMinute1)
+
+# the second, we compute an average fare rate for all trips based on the total 
+# fare collected and the total minutes driven
+# we are ineterested here in estimating an average  fare rate for all minutes driven
+# this is a more coarse-grained descriptive statistic of the data
+meanFarePerMinute2 = sum(cleanTripData$fare_amount) / sum(cleanTripData$trip_time_in_secs / 60) 
+print(meanFarePerMinute2)
+
+# What is the median of the taxi's fare per mile driven?*
+# note although we have irrational extremely high values, the median is robust and resists the effect of outliers
+farePerMile_median = median( cleanTripData$fare_amount / cleanTripData$trip_distance, na.rm = TRUE )
+print(farePerMile_median)
+
+# What is the 95 percentile of the taxi's average driving speed in miles per hour?*
+averageSpeed_95_percentile = quantile(cleanTripData$trip_distance / (cleanTripData$trip_time_in_secs / 3600), na.rm = TRUE, 0.95)
+print(averageSpeed_95_percentile)
+
+# What is the average ratio of the distance between the pickup and dropoff divided by the distance driven?*
 cleanTripData$trip_distance2 = getDistanceFromLatLonInMiles(cleanTripData$pickup_latitude, cleanTripData$pickup_longitude, cleanTripData$dropoff_latitude, cleanTripData$dropoff_longitude)
 # cleanTripData = cleanTripData[(cleanTripData$trip_distance2 / cleanTripData$trip_distance < 10),]
 
@@ -200,17 +208,50 @@ print(averageTip) # USD 4.472189
 
 
 # What is the median March revenue of a taxi driver?*
-cleanTripData = mergedTripData[!(mergedTripData$trip_distance <= 0.01|
-                                   mergedTripData$trip_time_in_secs == 0| 
-                                   mergedTripData$pickup_longitude == 0 |
-                                   mergedTripData$pickup_latitude == 0  |
-                                   mergedTripData$dropoff_longitude == 0 |
-                                   mergedTripData$dropoff_latitude == 0 ),]
-# for credit card payments, the driver's revenue is the total amount less the %5 credit card payment fee
-# less the mta tax
 
-# for cash payments, the driver's revenue is the total amount less the mta tax
-cleanTripData$driver_revenue = 
+str(fact_clean)
+
+# drivers = 
+#   cleanTripData %>%
+#   select(hack_license)%>%
+#   distinct()
+# nrow(drivers)
+# 
+# owners = 
+#   cleanTripData %>%
+#   select(medallion)%>%
+#   distinct()
+# nrow(owners)
+
+# The following shows that some car/medallions are driven/operated by multiple drivers
+# however, we are only interested in the total revenues per driver in March
+owners_drivers = 
+  cleanTripData %>%
+  select(medallion, hack_license)%>%
+  distinct()
+nrow(owners_drivers)
+
+
+
+# for cash payments, the driver's revenues are simply the total amount he is paid 
+# during the month.  The net revenues is the total amount less the mta tax and the tolls.
+# of course, some other factors could have been taken into account when calculating the net,
+# such as the lease fees, the petrol costs in addition to other recurring vehicle and drivers 
+# costs
+#
+drivers_summary= 
+  cleanTripData %>%
+  group_by(hack_license) %>%
+  select(fare_amount,surcharge, mta_tax, tip_amount, tolls_amount, total_amount) %>%
+  summarise(total_fare = sum(fare_amount), total_surcharge = sum(surcharge), 
+            total_mta_tax = sum(mta_tax), total_tip = sum(tip_amount), total_tolls = sum(tolls_amount), total_amounts = sum(total_amount)) %>%
+  transmute(total_fare = total_fare, total_income = total_fare + total_surcharge + total_tip, total_amounts = total_amounts) %>%
+  summarise(med_fare = median(total_fare), med_income = median(total_income), med_total_amounts = median(total_amounts))
+  
+
+drivers_summary
+#The answer
+print(drivers_summary$med_total_amounts)
 
 
 
