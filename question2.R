@@ -204,9 +204,6 @@ print(averageTip2) # USD 4.472189
 
 # What is the median March revenue of a taxi driver?*
 
-str(fact_clean)
-
-
 
 # The following shows that some car/medallions are driven/operated by multiple drivers
 # however, we are only interested in the total revenues per driver in March
