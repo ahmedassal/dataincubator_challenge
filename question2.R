@@ -154,6 +154,7 @@ print(meanFarePerMinute2)
 
 # What is the median of the taxi's fare per mile driven?*
 # note although we have irrational extremely high values, the median is robust and resists the effect of outliers
+gc()
 farePerMile_median = median( cleanTripData$fare_amount / cleanTripData$trip_distance, na.rm = TRUE )
 print(farePerMile_median)
 
@@ -162,15 +163,19 @@ averageSpeed_95_percentile = quantile(cleanTripData$trip_distance / (cleanTripDa
 print(averageSpeed_95_percentile)
 
 # What is the average ratio of the distance between the pickup and dropoff divided by the distance driven?*
+gc()
 cleanTripData$trip_distance2 = getDistanceFromLatLonInMiles(cleanTripData$pickup_latitude, cleanTripData$pickup_longitude, cleanTripData$dropoff_latitude, cleanTripData$dropoff_longitude)
-# cleanTripData = cleanTripData[(cleanTripData$trip_distance2 / cleanTripData$trip_distance < 10),]
 
-average_pickupDropoff_distance_to_trip_distance_ratio = mean(getDistanceFromLatLonInMiles(cleanTripData$pickup_latitude, cleanTripData$pickup_longitude, cleanTripData$dropoff_latitude, cleanTripData$dropoff_longitude) / cleanTripData$trip_distance)
-average_distances_ratios =  cleanTripData$trip_distance2 / cleanTripData$trip_distance
-# average_distances_ratio1 = mean( cleanTripData$trip_distance2 / cleanTripData$trip_distance)
+# The distance between the pickup and dropoff clearly should be much less than, 
+# on average, than the trip distance.
+# The following result is clearly erroneos due to extreme values. This is probably due to errors in the measurements.
+average_distances_ratio1 = mean(getDistanceFromLatLonInMiles(cleanTripData$pickup_latitude, cleanTripData$pickup_longitude, cleanTripData$dropoff_latitude, cleanTripData$dropoff_longitude) / cleanTripData$trip_distance)
+print(average_distances_ratio1)
+
+# My Answer. 
+# The following result is much more logical. It calculates the mean after triming %1 of the topmost and bottom-most values
 average_distances_ratio2 = mean( cleanTripData$trip_distance2 / cleanTripData$trip_distance, trim = 0.01)
-# average_distances_ratio3 = mean( cleanTripData$trip_distance2 / cleanTripData$trip_distance, trim = 0.1)
-# average_distances_ratio4 = mean( cleanTripData$trip_distance2 / cleanTripData$trip_distance, trim = 0.2)
+print(average_distances_ratio2)
 
 # What is the average tip for rides from JFK?*
 gc()
@@ -181,64 +186,54 @@ WithinJFKAirport = function(lat,long, larger_bbox = FALSE){
   else{
     return(lat > 40.640668 & lat < 40.651381 & long > -73.794694 & long < -73.776283)  
   }
-
   #JFK larger bounding box -73.8352, 40.6195, -73.7401, 40.6659
-  #JFK centroid -73.7900, 40.6437
-
 }
-
-cleanTripData = mergedTripData[!(mergedTripData$trip_distance <= 0.01|
-                                   mergedTripData$trip_time_in_secs == 0| 
-                                   mergedTripData$pickup_longitude == 0 |
-                                   mergedTripData$pickup_latitude == 0  |
-                                   mergedTripData$dropoff_longitude == 0 |
-                                   mergedTripData$dropoff_latitude == 0 ),]
-
 
 
 # smaller bbox entries found : 219,612
+# My Answer
 ridesFromJFK = cleanTripData[WithinJFKAirport(cleanTripData$pickup_latitude, cleanTripData$pickup_longitude, larger_bbox = FALSE)]
-averageTip = mean(ridesFromJFK$tip_amount)
-print(averageTip) # USD 4.481728
+averageTip1 = mean(ridesFromJFK$tip_amount)
+print(averageTip1) # USD 4.481728
 
 # larger bbox entries found : 231,439
 ridesFromJFK = cleanTripData[WithinJFKAirport(cleanTripData$pickup_latitude, cleanTripData$pickup_longitude, larger_bbox = TRUE)]
-averageTip = mean(ridesFromJFK$tip_amount)
-print(averageTip) # USD 4.472189
+averageTip2 = mean(ridesFromJFK$tip_amount)
+print(averageTip2) # USD 4.472189
 
 
 # What is the median March revenue of a taxi driver?*
 
 str(fact_clean)
 
-# drivers = 
-#   cleanTripData %>%
-#   select(hack_license)%>%
-#   distinct()
-# nrow(drivers)
-# 
-# owners = 
-#   cleanTripData %>%
-#   select(medallion)%>%
-#   distinct()
-# nrow(owners)
+
 
 # The following shows that some car/medallions are driven/operated by multiple drivers
 # however, we are only interested in the total revenues per driver in March
+drivers = 
+  cleanTripData %>%
+  select(hack_license)%>%
+  distinct()
+nrow(drivers)
+
+owners = 
+  cleanTripData %>%
+  select(medallion)%>%
+  distinct()
+nrow(owners)
+
 owners_drivers = 
   cleanTripData %>%
   select(medallion, hack_license)%>%
   distinct()
 nrow(owners_drivers)
 
-
-
+gc()
 # for cash payments, the driver's revenues are simply the total amount he is paid 
-# during the month.  The net revenues is the total amount less the mta tax and the tolls.
+# during the month.  The net revenues are the total amount less the mta tax and the tolls.
 # of course, some other factors could have been taken into account when calculating the net,
 # such as the lease fees, the petrol costs in addition to other recurring vehicle and drivers 
 # costs
-#
 drivers_summary= 
   cleanTripData %>%
   group_by(hack_license) %>%
@@ -248,8 +243,6 @@ drivers_summary=
   transmute(total_fare = total_fare, total_income = total_fare + total_surcharge + total_tip, total_amounts = total_amounts) %>%
   summarise(med_fare = median(total_fare), med_income = median(total_income), med_total_amounts = median(total_amounts))
   
-
-drivers_summary
 #The answer
 print(drivers_summary$med_total_amounts)
 
