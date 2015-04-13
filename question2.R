@@ -200,6 +200,17 @@ print(averageTip) # USD 4.472189
 
 
 # What is the median March revenue of a taxi driver?*
-summary(mergedTripData$)
+cleanTripData = mergedTripData[!(mergedTripData$trip_distance <= 0.01|
+                                   mergedTripData$trip_time_in_secs == 0| 
+                                   mergedTripData$pickup_longitude == 0 |
+                                   mergedTripData$pickup_latitude == 0  |
+                                   mergedTripData$dropoff_longitude == 0 |
+                                   mergedTripData$dropoff_latitude == 0 ),]
+# for credit card payments, the driver's revenue is the total amount less the %5 credit card payment fee
+# less the mta tax
+
+# for cash payments, the driver's revenue is the total amount less the mta tax
+cleanTripData$driver_revenue = 
+
 
 
